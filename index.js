@@ -14,7 +14,7 @@ app.use(express.json());
 //   res.send('Hello World!');
 // });
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-
+const { createRemoteJWKSet, jwtVerify } = require('jose-cjs');
 
 const uri = process.env.MONGODB_URI
 
@@ -25,6 +25,33 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   }
 });
+
+
+const JWKS = createRemoteJWKSet(
+  new URL('http://localhost:3000/api/auth/jwks')
+);
+const verifyToken =async (req, res, next) => {
+  const authHeader = req?.headers?.authorization;
+  console.log("Backend Token",authHeader);
+  // const token = authHeader.split(' ')[1];
+  // console.log("Backend Token",token);
+
+  if (!authHeader) {
+    return res.status(401).send('Access Denied');
+  }
+
+  try {
+    const {payload} =await jwtVerify(authHeader,JWKS)
+    console.log("Payload",payload);
+    next();
+} catch (error) {
+  console.error("Token verification failed:", error);
+  return res.status(401).send('Invalid Token'); 
+};
+
+
+}
+
 
 // console.log(client);
 async function run() {
@@ -59,14 +86,12 @@ app.get('/',async (req, res) => {
       res.send(result);
     })  
  
-    app.get("/animal/:id", async(req,res)=>{
+    app.get("/animal/:id",verifyToken, async(req,res)=>{
       const id = req.params.id;
       const query = {_id: new ObjectId(id)};
       const result = await dbCollection.findOne(query);
       res.send(result);
     })
-
-    
 
 
 
