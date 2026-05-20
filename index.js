@@ -50,12 +50,24 @@ app.get('/',async (req, res) => {
       res.send(result);
     })
 
+  
+
 
     app.post('/animal', async(req,res)=>{
       const newPet = req.body;
       const result = await dbCollection.insertOne(newPet);
       res.send(result);
     })  
+ 
+    app.get("/animal/:id", async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await dbCollection.findOne(query);
+      res.send(result);
+    })
+
+    
+
 
 
     
