@@ -138,20 +138,6 @@ app.get("/animal", async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     app.post("/animal", async (req, res) => {
       const newPet = req.body;
       const result = await petsCollection.insertOne(newPet);
@@ -207,7 +193,7 @@ app.get("/animal", async (req, res) => {
       res.send(result);
     });
 
-    // ================= UPDATE PET =================
+
 
     app.patch(
       "/animal/:id",
@@ -323,52 +309,80 @@ app.get("/animal", async (req, res) => {
       }
     });
 
-    // app.patch(
-    //   "/adoption-request/:id",
-    //   verifyToken,
 
-    //   async (req, res) => {
-    //     const id = req.params.id;
 
-    //     const result = await adoptCollection.updateOne(
-    //       {
-    //         _id: new ObjectId(id),
-    //       },
+app.patch(
+  "/adoption-request/:id",
+  verifyToken,
 
-    //       {
-    //         $set: {
-    //           status: "approved",
-    //         },
-    //       },
-    //     );
+  async (req, res) => {
 
-    //     res.send(result);
-    //   },
-    // );
-app.patch("/adoption-request/:id", async (req, res) => {
+    try {
 
-  const id = req.params.id;
+      const id = req.params.id;
 
-  const { status } = req.body;
+      const { status, petId } = req.body;
 
-  const query = {
-    _id: new ObjectId(id),
-  };
+      // request update
+      const requestQuery = {
+        _id: new ObjectId(id),
+      };
 
-  const updateDoc = {
-    $set: {
-      status: status,
-    },
-  };
+      const updateRequest = {
+        $set: {
+          status: status,
+        },
+      };
 
-  const result = await adoptCollection.updateOne(
-    query,
-    updateDoc
-  );
+      const result = await adoptCollection.updateOne(
+        requestQuery,
+        updateRequest
+      );
 
-  res.send(result);
-});
+      // IF APPROVED
+      if (status === "approved") {
 
+        // pet adopted true
+        await petsCollection.updateOne(
+          {
+            _id: new ObjectId(petId),
+          },
+          {
+            $set: {
+              adopted: true,
+            },
+          }
+        );
+
+        // all other requests rejected
+        await adoptCollection.updateMany(
+          {
+            petId: petId,
+            _id: {
+              $ne: new ObjectId(id),
+            },
+          },
+          {
+            $set: {
+              status: "rejected",
+            },
+          }
+        );
+      }
+
+      res.send(result);
+
+    } catch (error) {
+
+      console.log(error);
+
+      res.status(500).send({
+        success: false,
+        message: "Failed To Update Request",
+      });
+    }
+  }
+);
 
 
 app.get(
@@ -402,6 +416,37 @@ app.get(
   }
 );
 
+
+app.delete(
+  "/adoption-request/:id",
+  verifyToken,
+
+  async (req, res) => {
+
+    try {
+
+      const id = req.params.id;
+
+      const query = {
+        _id: new ObjectId(id),
+      };
+
+      const result =
+        await adoptCollection.deleteOne(query);
+
+      res.send(result);
+
+    } catch (error) {
+
+      console.log(error);
+
+      res.status(500).send({
+        success: false,
+        message: "Failed To Cancel Request",
+      });
+    }
+  }
+);
 
 
 
