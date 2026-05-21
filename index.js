@@ -69,116 +69,6 @@ async function run() {
 
 
 
-app.get("/animal", async (req, res) => {
-
-  try {
-
-    const search = req.query.search || "";
-
-    const species = req.query.species;
-
-    const sort = req.query.sort;
-
-    // query object
-    let query = {};
-
-    // SEARCH BY PET NAME
-    if (search) {
-      query.petName = {
-        $regex: search,
-        $options: "i",
-      };
-    }
-
-    // FILTER BY SPECIES
-    if (species) {
-
-      const speciesArray = species.split(",");
-
-      query.species = {
-        $in: speciesArray,
-      };
-    }
-
-    // SORTING
-    let sortOption = {};
-
-    if (sort === "low") {
-      sortOption = {
-        adoptionFee: 1,
-      };
-    }
-
-    if (sort === "high") {
-      sortOption = {
-        adoptionFee: -1,
-      };
-    }
-
-    const result = await petsCollection
-      .find(query)
-      .sort(sortOption)
-      .toArray();
-
-    res.send(result);
-
-  } catch (error) {
-
-    console.log(error);
-
-    res.status(500).send({
-      success: false,
-      message: "Failed To Fetch Pets",
-    });
-  }
-});
-
-
-
-
-
-
-    app.post("/animal", async (req, res) => {
-      const newPet = req.body;
-      const result = await petsCollection.insertOne(newPet);
-      res.send(result);
-    });
-
-    app.get("/animal/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await petsCollection.findOne(query);
-      res.send(result);
-    });
-
-    app.get(
-      "/my-pets/:email",
-
-      async (req, res) => {
-        try {
-          // email
-          const email = req.params.email;
-
-          // query
-          const query = {
-            ownerEmail: email,
-          };
-
-          // find database
-          const result = await petsCollection.find(query).toArray();
-
-          res.send(result);
-        } catch (error) {
-          console.log(error);
-
-          res.status(500).send({
-            success: false,
-
-            message: "Failed To Fetch My Pets",
-          });
-        }
-      },
-    );
     app.delete("/animal/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -258,21 +148,21 @@ app.get("/animal", async (req, res) => {
           _id: new ObjectId(requestInfo.petId),
         });
 
-        // owner cannot adopt own pet
+      
         if (pet.ownerEmail === requestInfo.requesterEmail) {
           return res.status(400).send({
             message: "You Cannot Adopt Your Own Pet",
           });
         }
 
-        // already adopted
+       
         if (pet.adopted) {
           return res.status(400).send({
             message: "Pet Already Adopted",
           });
         }
 
-        // duplicate request
+      
         const existing = await adoptCollection.findOne({
           petId: requestInfo.petId,
 
@@ -339,10 +229,10 @@ app.patch(
         updateRequest
       );
 
-      // IF APPROVED
+    
       if (status === "approved") {
 
-        // pet adopted true
+      
         await petsCollection.updateOne(
           {
             _id: new ObjectId(petId),
@@ -354,7 +244,7 @@ app.patch(
           }
         );
 
-        // all other requests rejected
+  
         await adoptCollection.updateMany(
           {
             petId: petId,
@@ -383,6 +273,120 @@ app.patch(
     }
   }
 );
+
+
+
+
+app.get("/animal", async (req, res) => {
+
+  try {
+
+    const search = req.query.search || "";
+
+    const species = req.query.species;
+
+    const sort = req.query.sort;
+
+    // query object
+    let query = {};
+
+
+    if (search) {
+      query.petName = {
+        $regex: search,
+        $options: "i",
+      };
+    }
+
+    
+    if (species) {
+
+      const speciesArray = species.split(",");
+
+      query.species = {
+        $in: speciesArray,
+      };
+    }
+
+    // SORTING
+    let sortOption = {};
+
+    if (sort === "low") {
+      sortOption = {
+        adoptionFee: 1,
+      };
+    }
+
+    if (sort === "high") {
+      sortOption = {
+        adoptionFee: -1,
+      };
+    }
+
+    const result = await petsCollection
+      .find(query)
+      .sort(sortOption)
+      .toArray();
+
+    res.send(result);
+
+  } catch (error) {
+
+    console.log(error);
+
+    res.status(500).send({
+      success: false,
+      message: "Failed To Fetch Pets",
+    });
+  }
+});
+
+
+
+
+
+
+    app.post("/animal", async (req, res) => {
+      const newPet = req.body;
+      const result = await petsCollection.insertOne(newPet);
+      res.send(result);
+    });
+
+    app.get("/animal/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await petsCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.get(
+      "/my-pets/:email",
+
+      async (req, res) => {
+        try {
+          // email
+          const email = req.params.email;
+
+          // query
+          const query = {
+            ownerEmail: email,
+          };
+
+
+          const result = await petsCollection.find(query).toArray();
+
+          res.send(result);
+        } catch (error) {
+          console.log(error);
+
+          res.status(500).send({
+            success: false,
+
+            message: "Failed To Fetch My Pets",
+          });
+        }
+      },
+    );
 
 
 app.get(
