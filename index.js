@@ -64,12 +64,93 @@ async function run() {
       res.send("Hello World!");
       console.log(uri);
     });
-    app.get("/animal", async (req, res) => {
-      const cursor = await petsCollection.find();
-      const result = await cursor.toArray();
-      console.log(result);
-      res.send(result);
+
+
+
+
+
+app.get("/animal", async (req, res) => {
+
+  try {
+
+    const search = req.query.search || "";
+
+    const species = req.query.species;
+
+    const sort = req.query.sort;
+
+    // query object
+    let query = {};
+
+    // SEARCH BY PET NAME
+    if (search) {
+      query.petName = {
+        $regex: search,
+        $options: "i",
+      };
+    }
+
+    // FILTER BY SPECIES
+    if (species) {
+
+      const speciesArray = species.split(",");
+
+      query.species = {
+        $in: speciesArray,
+      };
+    }
+
+    // SORTING
+    let sortOption = {};
+
+    if (sort === "low") {
+      sortOption = {
+        adoptionFee: 1,
+      };
+    }
+
+    if (sort === "high") {
+      sortOption = {
+        adoptionFee: -1,
+      };
+    }
+
+    const result = await petsCollection
+      .find(query)
+      .sort(sortOption)
+      .toArray();
+
+    res.send(result);
+
+  } catch (error) {
+
+    console.log(error);
+
+    res.status(500).send({
+      success: false,
+      message: "Failed To Fetch Pets",
     });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     app.post("/animal", async (req, res) => {
       const newPet = req.body;
@@ -86,7 +167,6 @@ async function run() {
 
     app.get(
       "/my-pets/:email",
-      verifyToken,
 
       async (req, res) => {
         try {
@@ -95,7 +175,7 @@ async function run() {
 
           // query
           const query = {
-            useremail: email,
+            ownerEmail: email,
           };
 
           // find database
@@ -120,44 +200,12 @@ async function run() {
       res.send(result);
     });
 
-
-
-
-       app.get("/adopt", async (req, res) => {
+    app.get("/adopt", async (req, res) => {
       const cursor = await adoptCollection.find();
       const result = await cursor.toArray();
       console.log(result);
       res.send(result);
     });
-
-    // app.delete(
-    //     "/animal/:id",
-
-    //     async (req, res) => {
-    //       try {
-    //         const id = req.params.id;
-
-    //         const query = {
-    //           _id: new ObjectId(id),
-    //         };
-
-    //         const result =
-    //           await petsCollection.deleteOne(
-    //             query
-    //           );
-
-    //         res.send(result);
-    //       } catch (error) {
-    //         console.log(error);
-
-    //         res.status(500).send({
-    //           success: false,
-
-    //           message: "Failed To Delete Pet",
-    //         });
-    //       }
-    //     }
-    //   );
 
     // ================= UPDATE PET =================
 
@@ -216,90 +264,146 @@ async function run() {
       },
     );
 
-app.post(
-  "/adoption-request",
-  verifyToken,
-  async (req, res) => {
-    try {
-      const requestInfo = req.body;
+    app.post("/adoption-request", verifyToken, async (req, res) => {
+      try {
+        const requestInfo = req.body;
 
-      const pet =
-        await petsCollection.findOne({
-          _id: new ObjectId(
-            requestInfo.petId
-          ),
+        const pet = await petsCollection.findOne({
+          _id: new ObjectId(requestInfo.petId),
         });
 
-      // owner cannot adopt own pet
-      if (
-        pet.ownerEmail ===
-        requestInfo.requesterEmail
-      ) {
-        return res.status(400).send({
-          message:
-            "You Cannot Adopt Your Own Pet",
-        });
-      }
+        // owner cannot adopt own pet
+        if (pet.ownerEmail === requestInfo.requesterEmail) {
+          return res.status(400).send({
+            message: "You Cannot Adopt Your Own Pet",
+          });
+        }
 
-      // already adopted
-      if (pet.adopted) {
-        return res.status(400).send({
-          message:
-            "Pet Already Adopted",
-        });
-      }
+        // already adopted
+        if (pet.adopted) {
+          return res.status(400).send({
+            message: "Pet Already Adopted",
+          });
+        }
 
-      // duplicate request
-      const existing =
-        await adoptCollection.findOne({
+        // duplicate request
+        const existing = await adoptCollection.findOne({
           petId: requestInfo.petId,
 
-          requesterEmail:
-            requestInfo.requesterEmail,
+          requesterEmail: requestInfo.requesterEmail,
         });
 
-      if (existing) {
-        return res.status(400).send({
-          message:
-            "Already Requested",
-        });
+        if (existing) {
+          return res.status(400).send({
+            message: "Already Requested",
+          });
+        }
+
+        requestInfo.status = "pending";
+
+        requestInfo.createdAt = new Date();
+
+        const result = await adoptCollection.insertOne(requestInfo);
+
+        res.send(result);
+      } catch (error) {
+        console.log(error);
       }
+    });
 
-      requestInfo.status = "pending";
+    app.get("/adoption-request/:petId", verifyToken, async (req, res) => {
+      try {
+        const petId = req.params.petId;
 
-      requestInfo.createdAt =
-        new Date();
+        const result = await adoptCollection.find({ petId }).toArray();
 
-      const result =
-        await adoptCollection.insertOne(
-          requestInfo
-        );
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
 
-      res.send(result);
-    } catch (error) {
-      console.log(error);
-    }
-  }
-);
+    // app.patch(
+    //   "/adoption-request/:id",
+    //   verifyToken,
+
+    //   async (req, res) => {
+    //     const id = req.params.id;
+
+    //     const result = await adoptCollection.updateOne(
+    //       {
+    //         _id: new ObjectId(id),
+    //       },
+
+    //       {
+    //         $set: {
+    //           status: "approved",
+    //         },
+    //       },
+    //     );
+
+    //     res.send(result);
+    //   },
+    // );
+app.patch("/adoption-request/:id", async (req, res) => {
+
+  const id = req.params.id;
+
+  const { status } = req.body;
+
+  const query = {
+    _id: new ObjectId(id),
+  };
+
+  const updateDoc = {
+    $set: {
+      status: status,
+    },
+  };
+
+  const result = await adoptCollection.updateOne(
+    query,
+    updateDoc
+  );
+
+  res.send(result);
+});
+
+
 
 app.get(
-  "/adoption-request/:petId",
+  "/my-adoption-requests/:email",
   verifyToken,
+
   async (req, res) => {
     try {
-      const petId = req.params.petId;
 
-      const result =
-        await adoptCollection
-          .find({ petId })
-          .toArray();
+      const email = req.params.email;
+
+      const query = {
+        requesterEmail: email,
+      };
+
+      const result = await adoptCollection
+        .find(query)
+        .toArray();
 
       res.send(result);
+
     } catch (error) {
+
       console.log(error);
+
+      res.status(500).send({
+        success: false,
+        message: "Failed To Fetch Requests",
+      });
     }
   }
 );
+
+
+
 
   } finally {
     // Ensures that the client will close when you finish/error
