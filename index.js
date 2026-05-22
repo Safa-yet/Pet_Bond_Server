@@ -277,7 +277,7 @@ app.patch(
 
 
 
-app.get("/animal", async (req, res) => {
+app.get("/animal",verifyToken, async (req, res) => {
 
   try {
 
